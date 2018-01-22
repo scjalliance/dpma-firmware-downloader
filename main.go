@@ -44,16 +44,8 @@ func main() {
 		}
 		break
 	}
-	log.Println("Manifest retrieved.")
+	log.Println("Manifest retrieved and parsed successfully.")
 
 	// Print the results for now
-	log.Printf("Origin: %s", manifest.URL)
-	log.Printf("Tarball: %s", manifest.Tarball)
-
-	for _, branch := range manifest.Releases.Branches() {
-		log.Printf("Branch %s:", branch.Name)
-		for r := range branch.Releases {
-			log.Printf("%v", branch.Releases[r])
-		}
-	}
+	log.Printf("Manifest Data:\n%s", manifest.Summary())
 }
