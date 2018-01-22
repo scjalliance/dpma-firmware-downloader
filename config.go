@@ -2,23 +2,32 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
+
+	"github.com/scjalliance/dpmafirmware"
 )
 
 // Config holds configuration data for the DPMA firmware downloader
 type Config struct {
-	DataDir  string `json:"datadir"`
-	Manifest string `json:"manifest"`
-	Models   string `json:"models"`
+	FirmwareDir string `json:"firmwaredir"`
+	Manifest    string `json:"manifest"`
+	Models      string `json:"models"`
+}
+
+// CacheFile returns the path to the MD5 cache file for the given version.
+func (c *Config) CacheFile(v dpmafirmware.Version) string {
+	return filepath.Join(c.FirmwareDir, fmt.Sprintf("%s.md5", v))
 }
 
 // DefaultConfig holds the default configuration settings.
 var DefaultConfig = Config{
-	DataDir:  "/var/lib/asterisk/digium_phones/firmware",
-	Manifest: "https://downloads.digium.com/pub/telephony/res_digium_phone/firmware/dpma-firmware.json",
-	Models:   "*",
+	FirmwareDir: "/var/lib/asterisk/digium_phones/firmware",
+	Manifest:    "https://downloads.digium.com/pub/telephony/res_digium_phone/firmware/dpma-firmware.json",
+	Models:      "*",
 }
 
 func buildConfig() (config Config) {
@@ -45,9 +54,9 @@ func buildConfig() (config Config) {
 		config.Manifest = val
 	}
 
-	if val := os.Getenv("DATA_DIR"); val != "" {
-		overload = append(overload, "DATA_DIR")
-		config.DataDir = val
+	if val := os.Getenv("FIRMWARE_DIR"); val != "" {
+		overload = append(overload, "FIRMWARE_DIR")
+		config.FirmwareDir = val
 	}
 
 	if val := os.Getenv("MODELS"); val != "" {
