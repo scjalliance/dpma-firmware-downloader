@@ -46,6 +46,11 @@ func main() {
 	}
 	log.Println("Manifest retrieved and parsed successfully.")
 
+	total := len(manifest.Releases)
+	manifest = manifest.IncludeMatch(config.Include.Models)
+	matched := len(manifest.Releases)
+	log.Printf("Model filter matches %d of %d releases.", matched, total)
+
 	// Print the results for now
 	log.Printf("Manifest Data:\n%s", manifest.Summary())
 
