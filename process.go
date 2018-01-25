@@ -14,10 +14,18 @@ import (
 
 const downloadSuffx = ".download"
 
-func process(config *Config, origin *fw.Origin, r *fw.Release) {
-	wanted := r.Models.Include(config.Include.Models).Exclude(config.Exclude.Models)
+func process(config *Config, origin *fw.Origin, acquired *AcquisitionMap, r *fw.Release) {
+	// Apply our model filters
+	matched := r.Models.Include(config.Include.Models).Exclude(config.Exclude.Models)
+
+	// Exclude models that have already reached their quota
+	wanted := matched.Exclude(acquired)
+
+	// Record the matched models in the acquistion map
+	acquired.Add(matched...)
+
+	// Return if we don't want any firmware from this release
 	if len(wanted) == 0 {
-		// This release doesn't have any firmware that we want
 		return
 	}
 

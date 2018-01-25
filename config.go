@@ -27,6 +27,7 @@ type Config struct {
 	Manifest    string `json:"manifest"`
 	Include     Filter `json:"include"`
 	Exclude     Filter `json:"exclude"`
+	Latest      int    `json:"latest"`
 	Flatten     bool   `json:"flatten"`
 }
 
@@ -74,6 +75,7 @@ func buildConfig() (config Config) {
 	envGlob("INCLUDE_FILES", &config.Include.Files, &overload)
 	envGlobSet("EXCLUDE_MODELS", &config.Exclude.Models, &overload)
 	envGlob("EXCLUDE_FILES", &config.Exclude.Files, &overload)
+	envInt("LATEST", &config.Latest, &overload)
 	envBool("FLATTEN", &config.Flatten, &overload)
 
 	// Arguments
@@ -84,6 +86,7 @@ func buildConfig() (config Config) {
 	flag.Var(&config.Include.Files, "includefiles", "Files to include, value or glob")
 	flag.Var(&config.Exclude.Models, "exclude", "Models to exclude, comma-separated values or globs")
 	flag.Var(&config.Exclude.Files, "excludefiles", "Files to exclude, value or glob")
+	flag.IntVar(&config.Latest, "latest", config.Latest, "# of releases to download for each model (0 for unlimited)")
 	flag.BoolVar(&config.Flatten, "flatten", config.Flatten, "flatten extracted files to single directory")
 	flag.Parse()
 
@@ -112,6 +115,11 @@ func buildConfig() (config Config) {
 	log.Printf("Exclude Models: %s", config.Exclude.Models)
 	log.Printf("Include Files:  %s", config.Include.Files)
 	log.Printf("Exclude Files:  %s", config.Exclude.Files)
+	if config.Latest == 0 {
+		log.Printf("Latest:         unlimited")
+	} else {
+		log.Printf("Latest:         %d", config.Latest)
+	}
 	log.Printf("Flatten:        %v", config.Flatten)
 
 	return config
@@ -135,6 +143,13 @@ func envGlobSet(name string, value *globber.Set, overload *[]string) {
 	if env := os.Getenv(name); env != "" {
 		*overload = append(*overload, name)
 		*value = globber.Split(env)
+	}
+}
+
+func envInt(name string, value *int, overload *[]string) {
+	if env := os.Getenv(name); env != "" {
+		*overload = append(*overload, name)
+		*value, _ = strconv.Atoi(env)
 	}
 }
 

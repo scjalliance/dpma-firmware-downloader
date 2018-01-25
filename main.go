@@ -52,8 +52,12 @@ func main() {
 
 	//log.Printf("Manifest Data:\n%s", manifest.Summary())
 
+	// Keep track of how many versions we've acquired for each model
+	var acq AcquisitionMap
+	acq.Require(config.Latest)
+
 	// Process each release
 	for _, r := range manifest.Releases {
-		process(&config, &manifest.Origin, &r)
+		process(&config, &manifest.Origin, &acq, &r)
 	}
 }
