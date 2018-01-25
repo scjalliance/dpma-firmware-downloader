@@ -23,6 +23,7 @@ type Filter struct {
 // Config holds configuration data for the DPMA firmware downloader
 type Config struct {
 	FirmwareDir string `json:"firmwaredir"`
+	CacheDir    string `json:"cachedir"`
 	Manifest    string `json:"manifest"`
 	Include     Filter `json:"include"`
 	Exclude     Filter `json:"exclude"`
@@ -36,83 +37,75 @@ func (c *Config) CacheFile(v fw.Version) string {
 
 // DefaultConfig holds the default configuration settings.
 var DefaultConfig = Config{
-	FirmwareDir: "/var/lib/asterisk/digium_phones/firmware",
+	FirmwareDir: "fw",
+	CacheDir:    "cache",
 	Manifest:    "https://downloads.digium.com/pub/telephony/res_digium_phone/firmware/dpma-firmware.json",
-	Include:     Filter{Models: globber.Split(fw.Wildcard), Files: globber.New("*.eff")},
+	Include:     Filter{Models: globber.NewSet("*"), Files: globber.New("*.eff")},
 }
 
 func buildConfig() (config Config) {
-	// Load configuration settings.
-	data, err := ioutil.ReadFile("/etc/config.json")
+	var (
+		overload         []string // Slice of provided environment variable names
+		configFileLoaded bool
+		configFile       = "config.json"
+	)
+	envString("CONFIG_FILE", &configFile, &overload)
+
+	// Configuration File or Defaults
+	data, err := ioutil.ReadFile(configFile)
 
 	switch {
 	case os.IsNotExist(err):
-		log.Println("No configuration file found. Using defaults.")
 		config = DefaultConfig
 	case err == nil:
 		if err = json.Unmarshal(data, &config); err != nil {
 			log.Fatal(err)
 		}
-		log.Println("Loaded configuration from config.json")
+		configFileLoaded = true
 	default:
 		log.Println(err)
 	}
 
-	var overload []string
+	// Environment Variables
+	envString("MANIFEST", &config.Manifest, &overload)
+	envString("FIRMWARE_DIR", &config.FirmwareDir, &overload)
+	envString("CACHE_DIR", &config.CacheDir, &overload)
+	envGlobSet("INCLUDE_MODELS", &config.Include.Models, &overload)
+	envGlob("INCLUDE_FILES", &config.Include.Files, &overload)
+	envGlobSet("EXCLUDE_MODELS", &config.Exclude.Models, &overload)
+	envGlob("EXCLUDE_FILES", &config.Exclude.Files, &overload)
+	envBool("FLATTEN", &config.Flatten, &overload)
 
-	if val := os.Getenv("MANIFEST"); val != "" {
-		overload = append(overload, "MANIFEST")
-		config.Manifest = val
-	}
+	// Arguments
+	flag.StringVar(&config.Manifest, "url", config.Manifest, "URL of DPMA manifest")
+	flag.StringVar(&config.FirmwareDir, "firmwaredir", config.FirmwareDir, "Directory in which to save firmware")
+	flag.StringVar(&config.CacheDir, "cachedir", config.CacheDir, "Directory in which to save cache files")
+	flag.Var(&config.Include.Models, "include", "Models to include, comma-separated values or globs")
+	flag.Var(&config.Include.Files, "includefiles", "Files to include, value or glob")
+	flag.Var(&config.Exclude.Models, "exclude", "Models to exclude, comma-separated values or globs")
+	flag.Var(&config.Exclude.Files, "excludefiles", "Files to exclude, value or glob")
+	flag.BoolVar(&config.Flatten, "flatten", config.Flatten, "flatten extracted files to single directory")
+	flag.Parse()
 
-	if val := os.Getenv("FIRMWARE_DIR"); val != "" {
-		overload = append(overload, "FIRMWARE_DIR")
-		config.FirmwareDir = val
-	}
+	log.Println("Starting dpma firmware downloader...")
 
-	if val := os.Getenv("INCLUDE_MODELS"); val != "" {
-		overload = append(overload, "INCLUDE_MODELS")
-		config.Include.Models = globber.Split(val)
-	}
-
-	if val := os.Getenv("INCLUDE_FILES"); val != "" {
-		overload = append(overload, "INCLUDE_FILES")
-		config.Include.Files = globber.New(val)
-	}
-
-	if val := os.Getenv("EXCLUDE_MODELS"); val != "" {
-		overload = append(overload, "EXCLUDE_MODELS")
-		config.Exclude.Models = globber.Split(val)
-	}
-
-	if val := os.Getenv("EXCLUDE_FILES"); val != "" {
-		overload = append(overload, "EXCLUDE_FILES")
-		config.Exclude.Files = globber.New(val)
-	}
-
-	if val := os.Getenv("FLATTEN"); val != "" {
-		overload = append(overload, "FLATTEN")
-		config.Flatten, _ = strconv.ParseBool(val)
+	if configFileLoaded {
+		log.Printf("Loaded configuration from \"%s\"", configFile)
+	} else {
+		log.Printf("No configuration file found at \"%s\". Using defaults.", configFile)
 	}
 
 	if len(overload) > 0 {
-		log.Printf("Overriding configuration from environment variables: %v", overload)
+		log.Printf("Loaded configuration from environment variables: %v", overload)
 	} else {
 		log.Println("No environment variables provided for configuration.")
 	}
 
 	if len(os.Args) > 1 {
-		log.Printf("Overriding configuration from command line arguments.")
-		flag.StringVar(&config.Manifest, "url", config.Manifest, "URL of DPMA manifest")
-		flag.StringVar(&config.FirmwareDir, "dir", config.FirmwareDir, "Directory in which to save firmware")
-		flag.Var(&config.Include.Models, "inc", "Models to include, comma-separated values or globs")
-		flag.Var(&config.Include.Files, "incfiles", "Files to include, value or glob")
-		flag.Var(&config.Exclude.Models, "exc", "Models to exclude, comma-separated values or globs")
-		flag.Var(&config.Exclude.Files, "excfiles", "Files to exclude, value or glob")
-		flag.BoolVar(&config.Flatten, "flatten", config.Flatten, "flatten extracted files to single directory")
-		flag.Parse()
+		log.Printf("Loaded configuration from command line arguments.")
 	}
 
+	// Summary
 	log.Printf("Manifest URL:   %s", config.Manifest)
 	log.Printf("FirmwareDir:    %s", config.FirmwareDir)
 	log.Printf("Include Models: %s", config.Include.Models)
@@ -122,4 +115,32 @@ func buildConfig() (config Config) {
 	log.Printf("Flatten:        %v", config.Flatten)
 
 	return config
+}
+
+func envString(name string, value *string, overload *[]string) {
+	if env := os.Getenv(name); env != "" {
+		*overload = append(*overload, name)
+		*value = env
+	}
+}
+
+func envGlob(name string, value *globber.Glob, overload *[]string) {
+	if env := os.Getenv(name); env != "" {
+		*overload = append(*overload, name)
+		*value = globber.New(env)
+	}
+}
+
+func envGlobSet(name string, value *globber.Set, overload *[]string) {
+	if env := os.Getenv(name); env != "" {
+		*overload = append(*overload, name)
+		*value = globber.Split(env)
+	}
+}
+
+func envBool(name string, value *bool, overload *[]string) {
+	if env := os.Getenv(name); env != "" {
+		*overload = append(*overload, name)
+		*value, _ = strconv.ParseBool(env)
+	}
 }

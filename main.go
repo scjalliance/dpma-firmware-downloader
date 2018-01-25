@@ -16,8 +16,6 @@ const (
 )
 
 func main() {
-	log.Println("Starting dpma firmware downloader...")
-
 	var (
 		config   = buildConfig()
 		manifest fw.Manifest
