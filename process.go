@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	fw "github.com/scjalliance/dpmafirmware"
 )
@@ -18,7 +19,13 @@ func process(config *Config, origin *fw.Origin, r *fw.Release) {
 	cacheFile := config.CacheFile(r.Version)
 	cachedMD5Sum, err := readCacheFile(cacheFile)
 
-	prefix := fmt.Sprintf("%-7s: ", r.Version) // Convenient logging prefix
+	wanted := r.Models.Include(config.Include.Models).Exclude(config.Exclude.Models)
+	if len(wanted) == 0 {
+		// This release doesn't have any firmware that we want
+		return
+	}
+
+	prefix := fmt.Sprintf("%-7s [%v]: ", r.Version, wanted) // Convenient logging prefix
 
 	// Cache test
 	if err == nil {
@@ -41,7 +48,7 @@ func process(config *Config, origin *fw.Origin, r *fw.Release) {
 	}
 	defer reader.Close()
 
-	files, err := download(prefix, reader, config.FirmwareDir, downloadSuffx)
+	files, err := download(config, prefix, reader, wanted, config.FirmwareDir, downloadSuffx)
 	if err != nil {
 		log.Printf("%sDownload failed: %v", prefix, err)
 		return
@@ -85,12 +92,23 @@ func process(config *Config, origin *fw.Origin, r *fw.Release) {
 	}
 }
 
-func download(prefix string, reader *fw.Reader, destDir string, suffix string) (files []string, err error) {
+func download(config *Config, prefix string, reader *fw.Reader, models fw.ModelSet, destDir string, suffix string) (files []string, err error) {
 	header, readerErr := reader.Next()
 
 	for readerErr == nil {
+		if !shouldDownload(config, models, header) {
+			header, readerErr = reader.Next()
+			continue
+		}
+
 		// Determine the destination file with suffix
-		path := filepath.Join(destDir, header.Name) + suffix
+		var path string
+		if config.Flatten {
+			path = header.Name
+		} else {
+			path = header.Path
+		}
+		path = filepath.Join(destDir, path) + suffix
 
 		// Create the file
 		file, createErr := createDownloadFile(path)
@@ -103,13 +121,16 @@ func download(prefix string, reader *fw.Reader, destDir string, suffix string) (
 		files = append(files, path)
 
 		// Log the download
-		log.Printf("%sDownloading %s (modified: %v, bytes: %d)", prefix, header.Name, header.ModTime, header.Size)
+		log.Printf("%sDownloading %s for %v (modified: %v, bytes: %d)", prefix, header.Name, header.Models, header.ModTime, header.Size)
 
 		// Copy the file data from the stream to the destination file
 		_, copyErr := io.Copy(file, reader)
 
 		// Close the file
 		file.Close()
+
+		// Update the file timestamp
+		os.Chtimes(path, time.Now(), header.ModTime)
 
 		// Check for a failure during the copy
 		if copyErr != nil {
@@ -126,4 +147,23 @@ func download(prefix string, reader *fw.Reader, destDir string, suffix string) (
 	}
 
 	return
+}
+
+func shouldDownload(config *Config, models fw.ModelSet, header *fw.Header) bool {
+	if len(header.Models) > 0 && !models.Map().Contains(header.Models...) {
+		// The file doesn't pertain to one of the models we want
+		return false
+	}
+
+	if inc := config.Include.Files; inc.String() != "" && !inc.Match(header.Path) {
+		// This isn't one of the files we've been asked to include
+		return false
+	}
+
+	if exc := config.Exclude.Files; exc.String() != "" && exc.Match(header.Path) {
+		// This is one of the files we've been asked to exclude
+		return false
+	}
+
+	return true
 }
