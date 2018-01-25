@@ -16,6 +16,13 @@ func readCacheFile(path string) (string, error) {
 }
 
 func writeCacheFile(path string, md5sum string) error {
+	// Prepare the directory
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0777); err != nil {
+		return fmt.Errorf("unable to prepare directory for download: %v", err)
+	}
+
+	// Write the file
 	return ioutil.WriteFile(path, []byte(md5sum), 0644)
 }
 

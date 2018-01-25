@@ -47,10 +47,9 @@ func main() {
 	total := len(manifest.Releases)
 	manifest = manifest.Filter(fw.ModelMatchFilter(config.Include.Models))
 	matched := len(manifest.Releases)
-	log.Printf("Model filter matches %d of %d releases.", matched, total)
+	log.Printf("Filter matches %d of %d releases.", matched, total)
 
-	// Print the results for now
-	log.Printf("Manifest Data:\n%s", manifest.Summary())
+	//log.Printf("Manifest Data:\n%s", manifest.Summary())
 
 	for _, r := range manifest.Releases {
 		process(&config, &manifest.Origin, &r)

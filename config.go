@@ -31,8 +31,8 @@ type Config struct {
 }
 
 // CacheFile returns the path to the MD5 cache file for the given version.
-func (c *Config) CacheFile(v fw.Version) string {
-	return filepath.Join(c.FirmwareDir, fmt.Sprintf("%s.md5", v))
+func (c *Config) CacheFile(v fw.Version, model string) string {
+	return filepath.Join(c.CacheDir, fmt.Sprintf("%s.%s.md5", v, model))
 }
 
 // DefaultConfig holds the default configuration settings.
