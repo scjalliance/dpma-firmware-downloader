@@ -44,6 +44,7 @@ func main() {
 	}
 	log.Println("Manifest retrieved and parsed successfully.")
 
+	// Filter the manifest
 	total := len(manifest.Releases)
 	manifest = manifest.Filter(fw.ModelMatchFilter(config.Include.Models))
 	matched := len(manifest.Releases)
@@ -51,6 +52,7 @@ func main() {
 
 	//log.Printf("Manifest Data:\n%s", manifest.Summary())
 
+	// Process each release
 	for _, r := range manifest.Releases {
 		process(&config, &manifest.Origin, &r)
 	}
