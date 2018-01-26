@@ -41,7 +41,7 @@ func (status *CacheStatus) Summary() []string {
 	var output []string
 	add := func(kind string, models fw.ModelSet) {
 		if len(models) > 0 {
-			output = append(output, fmt.Sprintf("[%s]: %-11s (md5: %s)", strings.Join(models, ","), kind, status.md5Sum))
+			output = append(output, fmt.Sprintf("[%s]: %-11s  md5: %s", strings.Join(models, ","), kind, status.md5Sum))
 		}
 	}
 	add("Up to date", status.Current)

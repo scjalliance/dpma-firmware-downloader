@@ -59,11 +59,11 @@ func process(shutdown signaler.Signal, config *Config, origin *fw.Origin, acquir
 	// Proceed with downloading the needed files
 	//prefix = fmt.Sprintf("%s [%v]: ", prefix, needed)
 	source := r.URL(origin)
-	log.Printf("%sDownloading %s", neededPrefix, source)
+	log.Printf("%sDownloading  url: %s", neededPrefix, source)
 
 	reader, err := r.Get(origin)
 	if err != nil {
-		log.Printf("%sDownload Failed: %v", neededPrefix, err)
+		log.Printf("%sFailed     error: %v", neededPrefix, err)
 		return
 	}
 
@@ -76,19 +76,19 @@ func process(shutdown signaler.Signal, config *Config, origin *fw.Origin, acquir
 	files, err := download(config, versionPrefix, reader, needed, config.FirmwareDir, downloadSuffx)
 	var failed []string
 	if err != nil {
-		log.Printf("%sDownload failed: %v", neededPrefix, err)
+		log.Printf("%sFailed     error: %v", neededPrefix, err)
 		failed = files
 	} else {
 		downloadMD5Sum := reader.MD5Sum()
 		if downloadMD5Sum == r.MD5Sum {
-			log.Printf("%sVerified    (md5: %s)", neededPrefix, downloadMD5Sum)
+			log.Printf("%sVerified     md5: %s", neededPrefix, downloadMD5Sum)
 			for _, oldpath := range files {
 				newpath := strings.TrimSuffix(oldpath, downloadSuffx)
 				if mvErr := os.Rename(oldpath, newpath); mvErr != nil {
 					failed = append(failed, oldpath)
 					log.Printf("%sInstallation failed: %s: %v", neededPrefix, newpath, mvErr)
 				} else {
-					log.Printf("%sInstalled   \"%s\"", neededPrefix, newpath)
+					log.Printf("%sInstalled   path: %s", neededPrefix, newpath)
 				}
 			}
 		} else {
@@ -103,7 +103,7 @@ func process(shutdown signaler.Signal, config *Config, origin *fw.Origin, acquir
 			if rmErr := removeDownloadFile(path); rmErr != nil {
 				log.Printf("%sUnable to remove %s: %v", neededPrefix, path, rmErr)
 			} else {
-				log.Printf("%sRemoved %s", neededPrefix, path)
+				log.Printf("%sRemoved     path: %s", neededPrefix, path)
 			}
 		}
 		return
@@ -149,7 +149,7 @@ func download(config *Config, versionPrefix string, reader *fw.Reader, models fw
 
 		// Log the download
 		modelPrefix := fmt.Sprintf("%s[%v]: ", versionPrefix, header.Models)
-		log.Printf("%sProcessing  \"%s\" (modified: %v, bytes: %d)", modelPrefix, header.Name, header.ModTime, header.Size)
+		log.Printf("%sProcessing  file: %s (modified: %v, bytes: %d)", modelPrefix, header.Name, header.ModTime, header.Size)
 
 		// Copy the file data from the stream to the destination file
 		_, copyErr := io.Copy(file, reader)
