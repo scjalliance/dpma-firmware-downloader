@@ -5,8 +5,10 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/gentlemanautomaton/signaler"
 	fw "github.com/scjalliance/dpmafirmware"
 )
 
@@ -16,14 +18,19 @@ const (
 )
 
 func main() {
+	shutdown := signaler.New().Capture(os.Interrupt, os.Kill)
+	defer shutdown.Wait()
+	defer shutdown.Trigger()
+
+	// Process configuration
 	var (
 		config   = buildConfig()
 		manifest fw.Manifest
 	)
 
+	// Retrieve the firmware manifest
 	log.Printf("Retrieving DPMA firmware manifest from %s", config.Manifest)
 
-	// Retrieve the firmware manifest
 	for i := 0; i < attempts; i++ {
 		action := "retrieve the DPMA firmware manifest"
 		res, err := http.Get(config.Manifest)
@@ -58,6 +65,6 @@ func main() {
 
 	// Process each release
 	for _, r := range manifest.Releases {
-		process(&config, &manifest.Origin, &acq, &r)
+		process(shutdown.Signal, &config, &manifest.Origin, &acq, &r)
 	}
 }

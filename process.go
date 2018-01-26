@@ -9,12 +9,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gentlemanautomaton/signaler"
 	fw "github.com/scjalliance/dpmafirmware"
 )
 
 const downloadSuffx = ".download"
 
-func process(config *Config, origin *fw.Origin, acquired *AcquisitionMap, r *fw.Release) {
+func process(shutdown signaler.Signal, config *Config, origin *fw.Origin, acquired *AcquisitionMap, r *fw.Release) {
+	if shutdown.Signaled() {
+		return
+	}
+
 	// Apply our model filters
 	matched := r.Models.Include(config.Include.Models).Exclude(config.Exclude.Models)
 
@@ -47,6 +52,10 @@ func process(config *Config, origin *fw.Origin, acquired *AcquisitionMap, r *fw.
 		return
 	}
 
+	if shutdown.Signaled() {
+		return
+	}
+
 	// Proceed with downloading the needed files
 	//prefix = fmt.Sprintf("%s [%v]: ", prefix, needed)
 	source := r.URL(origin)
@@ -57,31 +66,35 @@ func process(config *Config, origin *fw.Origin, acquired *AcquisitionMap, r *fw.
 		log.Printf("%sDownload Failed: %v", neededPrefix, err)
 		return
 	}
-	defer reader.Close()
+
+	// Close the reader when we're done or if a shutdown is initiated
+	stop := shutdown.Derive()
+	stopped := stop.Then(func() { reader.Close() })
+	defer stopped.Wait()
+	defer stop.Trigger()
 
 	files, err := download(config, versionPrefix, reader, needed, config.FirmwareDir, downloadSuffx)
+	var failed []string
 	if err != nil {
 		log.Printf("%sDownload failed: %v", neededPrefix, err)
-		return
-	}
-
-	var failed []string
-
-	downloadMD5Sum := reader.MD5Sum()
-	if downloadMD5Sum == r.MD5Sum {
-		log.Printf("%sVerified    (md5: %s)", neededPrefix, downloadMD5Sum)
-		for _, oldpath := range files {
-			newpath := strings.TrimSuffix(oldpath, downloadSuffx)
-			if mvErr := os.Rename(oldpath, newpath); mvErr != nil {
-				failed = append(failed, oldpath)
-				log.Printf("%sInstallation failed: %s: %v", neededPrefix, newpath, mvErr)
-			} else {
-				log.Printf("%sInstalled   \"%s\"", neededPrefix, newpath)
-			}
-		}
-	} else {
-		log.Printf("%sDownload doesn't match manifest (download md5: %s, manifest md5: %s)", neededPrefix, downloadMD5Sum, r.MD5Sum)
 		failed = files
+	} else {
+		downloadMD5Sum := reader.MD5Sum()
+		if downloadMD5Sum == r.MD5Sum {
+			log.Printf("%sVerified    (md5: %s)", neededPrefix, downloadMD5Sum)
+			for _, oldpath := range files {
+				newpath := strings.TrimSuffix(oldpath, downloadSuffx)
+				if mvErr := os.Rename(oldpath, newpath); mvErr != nil {
+					failed = append(failed, oldpath)
+					log.Printf("%sInstallation failed: %s: %v", neededPrefix, newpath, mvErr)
+				} else {
+					log.Printf("%sInstalled   \"%s\"", neededPrefix, newpath)
+				}
+			}
+		} else {
+			log.Printf("%sDownload doesn't match manifest (download md5: %s, manifest md5: %s)", neededPrefix, downloadMD5Sum, r.MD5Sum)
+			failed = files
+		}
 	}
 
 	if len(failed) != 0 {
