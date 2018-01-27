@@ -32,6 +32,10 @@ func main() {
 	log.Printf("Retrieving DPMA firmware manifest from %s", config.Manifest)
 
 	for i := 0; i < attempts; i++ {
+		if shutdown.Signaled() {
+			return
+		}
+
 		action := "retrieve the DPMA firmware manifest"
 		res, err := http.Get(config.Manifest)
 		// TODO: Check response status code
