@@ -20,7 +20,16 @@ FROM gcr.io/distroless/base
 
 COPY --from=builder /go/bin/app /
 
-ENV CONFIG_FILE=/config.json FIRMWARE_DIR=/firmware CACHE_DIR=/cache FLATTEN=true
+ENV CONFIG_FILE=/config.json \
+    FIRMWARE_DIR=/firmware \
+    CACHE_DIR=/cache \
+    FLATTEN=true \
+    MANIFEST= \
+    INCLUDE_MODELS= \
+    INCLUDE_FILES= \
+    EXCLUDE_MODELS= \
+    EXCLUDE_FILES= \
+    LATEST=
 
 WORKDIR /firmware
 WORKDIR /cache
