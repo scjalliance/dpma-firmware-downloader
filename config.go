@@ -22,9 +22,9 @@ type Filter struct {
 
 // Config holds configuration data for the DPMA firmware downloader
 type Config struct {
+	Manifest    string `json:"manifest"`
 	FirmwareDir string `json:"firmwaredir"`
 	CacheDir    string `json:"cachedir"`
-	Manifest    string `json:"manifest"`
 	Include     Filter `json:"include"`
 	Exclude     Filter `json:"exclude"`
 	Latest      int    `json:"latest"`
@@ -110,7 +110,8 @@ func buildConfig() (config Config) {
 
 	// Summary
 	log.Printf("Manifest URL:   %s", config.Manifest)
-	log.Printf("FirmwareDir:    %s", config.FirmwareDir)
+	log.Printf("Firmware Dir:   %s", config.FirmwareDir)
+	log.Printf("Cache Dir:      %s", config.CacheDir)
 	log.Printf("Include Models: %s", config.Include.Models)
 	log.Printf("Exclude Models: %s", config.Exclude.Models)
 	log.Printf("Include Files:  %s", config.Include.Files)
