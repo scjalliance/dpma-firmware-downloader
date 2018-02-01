@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/gentlemanautomaton/signaler"
@@ -18,7 +19,7 @@ const (
 )
 
 func main() {
-	shutdown := signaler.New().Capture(os.Interrupt, os.Kill)
+	shutdown := signaler.New().Capture(os.Interrupt, syscall.SIGTERM)
 	defer shutdown.Wait()
 	defer shutdown.Trigger()
 
