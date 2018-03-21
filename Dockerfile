@@ -5,20 +5,24 @@ FROM golang:alpine as builder
 
 RUN apk --no-cache add git
 
-WORKDIR /go/src/app
+WORKDIR /go/src/github.com/scjalliance/dpma-firmware-downloader
 COPY . .
 
+# Disable CGO to make sure we don't rely on libc
 ENV CGO_ENABLED=0
 
-RUN go-wrapper download
-RUN go-wrapper install
+# Exclude debugging symbols and set the netgo tag for Go-based DNS resolution
+ENV BUILD_FLAGS="-v -a -ldflags '-d -s -w' -tags netgo"
+
+RUN go get -d -v ./...
+RUN go install -v ./...
 
 # --------
 # Stage 2: Release
 # --------
 FROM gcr.io/distroless/base
 
-COPY --from=builder /go/bin/app /
+COPY --from=builder /go/bin/dpma-firmware-downloader /
 
 ENV CONFIG_FILE=/config.json \
     FIRMWARE_DIR=/firmware \
@@ -37,4 +41,4 @@ WORKDIR /cache
 VOLUME /firmware
 VOLUME /cache
 
-CMD ["/app"]
+CMD ["/dpma-firmware-downloader"]
